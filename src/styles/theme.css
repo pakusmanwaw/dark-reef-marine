@@ -1,0 +1,54 @@
+:root {
+  /* =========================
+     DARK REEF MARINE
+     Brand Colors
+     ========================= */
+
+  --reef-red: #94161c;
+  --reef-red-dark: #751116;
+
+  --reef-turquoise: #4b9da8;
+  --reef-turquoise-dark: #357d87;
+  --reef-turquoise-light: #e7f4f5;
+
+  --deep-ocean: #161b27;
+
+  --reef-sand: #bcbba9;
+
+  /* =========================
+     Neutral Colors
+     ========================= */
+
+  --white: #ffffff;
+  --background: #f5f7f7;
+
+  --text: #252b32;
+  --text-muted: #5f6870;
+
+  --border: #dde5e6;
+
+  /* =========================
+     Status Colors
+     ========================= */
+
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --danger: #dc2626;
+
+  /* =========================
+     Border Radius
+     ========================= */
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* =========================
+     Shadows
+     ========================= */
+
+  --shadow-sm: 0 2px 8px rgba(22, 27, 39, 0.06);
+  --shadow-md: 0 8px 24px rgba(22, 27, 39, 0.1);
+  --shadow-lg: 0 16px 40px rgba(22, 27, 39, 0.14);
+}
