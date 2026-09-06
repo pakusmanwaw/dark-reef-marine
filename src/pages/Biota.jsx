@@ -52,7 +52,7 @@ function Biota() {
           created_at
         `)
         .order("created_at", { ascending: false })
-        .limit(100);
+        ;
 
       if (cancelled) {
         return;
@@ -109,9 +109,13 @@ function Biota() {
         category === "Semua" ||
         item.category === category;
 
+      const isAvailable =
+        Number(item.stock || 0) > 0;
+
       return (
         matchesSearch &&
-        matchesCategory
+        matchesCategory &&
+        isAvailable
       );
     });
   }, [
