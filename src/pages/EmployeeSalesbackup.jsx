@@ -32,6 +32,10 @@ function EmployeeSales() {
     },
   ]);
 
+  // Search produk per baris transaksi
+  const [productSearch, setProductSearch] = useState({});
+  const [openProductSearch, setOpenProductSearch] = useState(null);
+
   const [saving, setSaving] =
     useState(false);
 
@@ -162,6 +166,33 @@ function EmployeeSales() {
         String(product.id) ===
         String(productId)
     );
+  }
+
+  // =========================================================
+  // SEARCH PRODUCT
+  // =========================================================
+
+  function getFilteredProducts(index) {
+    const search =
+      String(productSearch[index] || "")
+        .toLowerCase()
+        .trim();
+
+    if (!search) {
+      return products;
+    }
+
+    return products.filter((product) => {
+      const name =
+        String(product.name || "").toLowerCase();
+      const englishName =
+        String(product.english_name || "").toLowerCase();
+
+      return (
+        name.includes(search) ||
+        englishName.includes(search)
+      );
+    });
   }
 
   // =========================================================
@@ -354,6 +385,10 @@ function EmployeeSales() {
   // =========================================================
 
   function handleRemoveItem(index) {
+    if (openProductSearch === index) {
+      setOpenProductSearch(null);
+    }
+
     setItems((currentItems) => {
       if (currentItems.length === 1) {
         return currentItems;
@@ -389,6 +424,9 @@ function EmployeeSales() {
         quantity: 1,
       },
     ]);
+
+    setProductSearch({});
+    setOpenProductSearch(null);
 
     setErrorMessage("");
 
@@ -1649,87 +1687,140 @@ function EmployeeSales() {
                             </label>
 
 
-                            <select
-                              value={
-                                item.productId
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                handleProductChange(
-                                  index,
-                                  event.target.value
-                                )
-                              }
-                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
-                            >
+                            <div className="relative mt-2">
+                              <div className="relative">
+                                <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-lg">
+                                  🔍
+                                </span>
 
-                              <option value="">
-                                Pilih produk...
-                              </option>
-
-
-                              {products.map(
-                                (
-                                  productItem
-                                ) => {
-
-                                  const productStock =
-                                    Number(
-                                      productItem.stock ||
-                                      0
-                                    );
-
-                                  let productPrice =
-                                    Number(
-                                      productItem.retail_price ??
-                                      productItem.price ??
-                                      0
-                                    );
-
-                                  if (
-                                    saleType ===
-                                    "reseller"
-                                  ) {
-                                    productPrice =
-                                      Number(
-                                        productItem.reseller_price ??
-                                        productItem.retail_price ??
-                                        productItem.price ??
-                                        0
-                                      );
+                                <input
+                                  type="text"
+                                  value={
+                                    productSearch[index] ??
+                                    (product?.name || "")
                                   }
+                                  onFocus={() =>
+                                    setOpenProductSearch(index)
+                                  }
+                                  onChange={(event) => {
+                                    const value = event.target.value;
 
-                                  return (
-                                    <option
-                                      key={
-                                        productItem.id
+                                    setProductSearch((current) => ({
+                                      ...current,
+                                      [index]: value,
+                                    }));
+
+                                    setOpenProductSearch(index);
+
+                                    // Saat user mengetik pencarian baru, batalkan pilihan lama.
+                                    setItems((currentItems) => {
+                                      const nextItems = [...currentItems];
+
+                                      if (nextItems[index]) {
+                                        nextItems[index] = {
+                                          ...nextItems[index],
+                                          productId: "",
+                                          quantity: 1,
+                                        };
                                       }
-                                      value={
-                                        productItem.id
-                                      }
-                                      disabled={
-                                        productStock <=
-                                        0
-                                      }
-                                    >
-                                      {
-                                        productItem.name
-                                      }
-                                      {" — Rp "}
-                                      {formatRupiah(
-                                        productPrice
-                                      )}
-                                      {" — Stok "}
-                                      {
-                                        productStock
-                                      }
-                                    </option>
-                                  );
-                                }
+
+                                      return nextItems;
+                                    });
+                                  }}
+                                  placeholder="Cari nama biota..."
+                                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                />
+                              </div>
+
+                              {openProductSearch === index && (
+                                <div className="absolute left-0 right-0 z-50 mt-2 max-h-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
+                                  {getFilteredProducts(index).length === 0 ? (
+                                    <div className="p-5 text-center">
+                                      <p className="font-semibold text-slate-600">
+                                        Produk tidak ditemukan
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-400">
+                                        Coba ketik nama biota atau English name.
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    getFilteredProducts(index).map((productItem) => {
+                                      const productStock = Number(
+                                        productItem.stock || 0
+                                      );
+
+                                      const productPrice =
+                                        saleType === "reseller"
+                                          ? Number(
+                                              productItem.reseller_price ??
+                                                productItem.retail_price ??
+                                                productItem.price ??
+                                                0
+                                            )
+                                          : Number(
+                                              productItem.retail_price ??
+                                                productItem.price ??
+                                                0
+                                            );
+
+                                      return (
+                                        <button
+                                          key={productItem.id}
+                                          type="button"
+                                          disabled={productStock <= 0}
+                                          onClick={() => {
+                                            handleProductChange(
+                                              index,
+                                              productItem.id
+                                            );
+
+                                            setProductSearch((current) => ({
+                                              ...current,
+                                              [index]: productItem.name || "",
+                                            }));
+
+                                            setOpenProductSearch(null);
+                                          }}
+                                          className={`block w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 ${
+                                            productStock <= 0
+                                              ? "cursor-not-allowed bg-slate-50 opacity-50"
+                                              : "hover:bg-cyan-50"
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between gap-4">
+                                            <div className="min-w-0">
+                                              <p className="truncate text-sm font-bold text-slate-800">
+                                                {productItem.name}
+                                              </p>
+                                              {productItem.english_name && (
+                                                <p className="mt-1 truncate text-xs text-slate-400">
+                                                  {productItem.english_name}
+                                                </p>
+                                              )}
+                                            </div>
+
+                                            <div className="shrink-0 text-right">
+                                              <p className="text-xs font-semibold text-slate-500">
+                                                Rp {formatRupiah(productPrice)}
+                                              </p>
+                                              <p
+                                                className={`mt-1 text-xs font-bold ${
+                                                  productStock > 0
+                                                    ? "text-cyan-600"
+                                                    : "text-red-400"
+                                                }`}
+                                              >
+                                                Stok {productStock}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
                               )}
-
-                            </select>
+                            </div>
 
                           </div>
 

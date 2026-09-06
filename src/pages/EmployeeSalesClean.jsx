@@ -45,6 +45,16 @@ function EmployeeSalesClean() {
   const [errorMessage, setErrorMessage] =
     useState("");
 
+  // =========================================================
+  // SEARCH PRODUK
+  // =========================================================
+
+  const [productSearch, setProductSearch] =
+    useState("");
+
+  const [activeSearchIndex, setActiveSearchIndex] =
+    useState(null);
+
 
   const [completedSale, setCompletedSale] =
     useState(null);
@@ -271,6 +281,39 @@ function EmployeeSalesClean() {
 
 
   // =========================================================
+  // FILTER PRODUK UNTUK SEARCH
+  // =========================================================
+
+  function getFilteredProducts() {
+
+    const keyword =
+      productSearch.trim().toLowerCase();
+
+
+    if (!keyword) {
+      return products;
+    }
+
+
+    return products.filter(
+      (product) =>
+        String(
+          product.name || ""
+        )
+          .toLowerCase()
+          .includes(keyword) ||
+
+        String(
+          product.english_name || ""
+        )
+          .toLowerCase()
+          .includes(keyword)
+    );
+
+  }
+
+
+  // =========================================================
   // TOTAL
   // =========================================================
 
@@ -416,6 +459,15 @@ function EmployeeSalesClean() {
     );
 
 
+    const selectedProduct =
+      getProduct(productId);
+
+    setProductSearch(
+      selectedProduct?.name || ""
+    );
+
+    setActiveSearchIndex(null);
+
     setErrorMessage("");
 
   }
@@ -526,6 +578,9 @@ function EmployeeSalesClean() {
       ]
     );
 
+    setProductSearch("");
+    setActiveSearchIndex(null);
+
   }
 
 
@@ -560,6 +615,9 @@ function EmployeeSalesClean() {
 
       }
     );
+
+    setProductSearch("");
+    setActiveSearchIndex(null);
 
   }
 
@@ -599,6 +657,9 @@ function EmployeeSalesClean() {
         quantity: 1,
       },
     ]);
+
+    setProductSearch("");
+    setActiveSearchIndex(null);
 
 
     setErrorMessage(
@@ -2179,120 +2240,225 @@ function EmployeeSalesClean() {
                             </label>
 
 
-                            <select
-                              value={
-                                item.productId
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                handleProductChange(
-                                  index,
-                                  event.target.value
-                                )
-                              }
-                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
-                            >
+                            <div className="relative mt-2">
 
-                              <option value="">
-                                Pilih produk...
-                              </option>
+                              <div className="relative">
+
+                                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                                  🔍
+                                </span>
 
 
-                              {products.map(
-                                (
-                                  productItem
-                                ) => {
-
-                                  const productStock =
-                                    Number(
-                                      productItem.stock ||
-                                      0
-                                    );
-
-
-                                  let productPrice =
-                                    Number(
-                                      productItem.retail_price ??
-                                      productItem.price ??
-                                      0
-                                    );
-
-
-                                  if (
-                                    saleType ===
-                                    "reseller"
-                                  ) {
-
-                                    productPrice =
-                                      Number(
-                                        productItem.reseller_price ??
-                                        productItem.retail_price ??
-                                        productItem.price ??
-                                        0
-                                      );
-
-                                  } else if (
-                                    saleType ===
-                                    "online_shop"
-                                  ) {
-
-                                    const retailPrice =
-                                      Number(
-                                        productItem.retail_price ??
-                                        productItem.price ??
-                                        0
-                                      );
-
-
-                                    productPrice =
-                                      Math.round(
-                                        retailPrice *
-                                        1.20
-                                      );
-
+                                <input
+                                  type="text"
+                                  value={
+                                    activeSearchIndex === index
+                                      ? productSearch
+                                      : product?.name || ""
                                   }
+                                  onFocus={() => {
+
+                                    const currentProduct =
+                                      getProduct(
+                                        item.productId
+                                      );
 
 
-                                  return (
+                                    setProductSearch(
+                                      currentProduct?.name || ""
+                                    );
 
-                                    <option
-                                      key={
-                                        productItem.id
+                                    setActiveSearchIndex(
+                                      index
+                                    );
+
+                                  }}
+                                  onChange={(
+                                    event
+                                  ) => {
+
+                                    setProductSearch(
+                                      event.target.value
+                                    );
+
+                                    setActiveSearchIndex(
+                                      index
+                                    );
+
+                                  }}
+                                  placeholder="Cari nama biota..."
+                                  autoComplete="off"
+                                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-11 pr-4 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                />
+
+                              </div>
+
+
+                              {activeSearchIndex === index && (
+
+                                <div className="absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+
+                                  {getFilteredProducts().length > 0 ? (
+
+                                    getFilteredProducts().map(
+                                      (productItem) => {
+
+                                        const productStock =
+                                          Number(
+                                            productItem.stock || 0
+                                          );
+
+
+                                        let productPrice =
+                                          Number(
+                                            productItem.retail_price ??
+                                            productItem.price ??
+                                            0
+                                          );
+
+
+                                        if (
+                                          saleType ===
+                                          "reseller"
+                                        ) {
+
+                                          productPrice =
+                                            Number(
+                                              productItem.reseller_price ??
+                                              productItem.retail_price ??
+                                              productItem.price ??
+                                              0
+                                            );
+
+                                        } else if (
+                                          saleType ===
+                                          "online_shop"
+                                        ) {
+
+                                          const retailPrice =
+                                            Number(
+                                              productItem.retail_price ??
+                                              productItem.price ??
+                                              0
+                                            );
+
+
+                                          productPrice =
+                                            Math.round(
+                                              retailPrice *
+                                              1.20
+                                            );
+
+                                        }
+
+
+                                        const disabled =
+                                          productStock <= 0;
+
+
+                                        return (
+
+                                          <button
+                                            key={
+                                              productItem.id
+                                            }
+                                            type="button"
+                                            disabled={
+                                              disabled
+                                            }
+                                            onMouseDown={(
+                                              event
+                                            ) => {
+                                              event.preventDefault();
+                                            }}
+                                            onClick={() => {
+
+                                              handleProductChange(
+                                                index,
+                                                productItem.id
+                                              );
+
+                                            }}
+                                            className={`w-full rounded-xl px-3 py-3 text-left transition ${
+                                              disabled
+                                                ? "cursor-not-allowed opacity-40"
+                                                : "hover:bg-cyan-50"
+                                            }`}
+                                          >
+
+                                            <div className="flex items-center justify-between gap-3">
+
+                                              <div className="min-w-0">
+
+                                                <p className="truncate text-sm font-semibold text-slate-800">
+                                                  {
+                                                    productItem.name
+                                                  }
+                                                </p>
+
+
+                                                {productItem.english_name && (
+
+                                                  <p className="mt-0.5 truncate text-xs text-slate-400">
+                                                    {
+                                                      productItem.english_name
+                                                    }
+                                                  </p>
+
+                                                )}
+
+                                              </div>
+
+
+                                              <div className="shrink-0 text-right">
+
+                                                <p className="text-sm font-bold text-cyan-600">
+                                                  Rp{" "}
+                                                  {
+                                                    formatRupiah(
+                                                      productPrice
+                                                    )
+                                                  }
+                                                </p>
+
+
+                                                <p
+                                                  className={`mt-0.5 text-xs font-medium ${
+                                                    disabled
+                                                      ? "text-red-400"
+                                                      : "text-slate-400"
+                                                  }`}
+                                                >
+                                                  Stok{" "}
+                                                  {
+                                                    productStock
+                                                  }
+                                                </p>
+
+                                              </div>
+
+                                            </div>
+
+                                          </button>
+
+                                        );
+
                                       }
-                                      value={
-                                        productItem.id
-                                      }
-                                      disabled={
-                                        productStock <=
-                                        0
-                                      }
-                                    >
+                                    )
 
-                                      {
-                                        productItem.name
-                                      }
+                                  ) : (
 
-                                      {" — Rp "}
+                                    <div className="px-4 py-5 text-center text-sm text-slate-500">
+                                      Biota tidak ditemukan.
+                                    </div>
 
-                                      {formatRupiah(
-                                        productPrice
-                                      )}
+                                  )}
 
-                                      {" — Stok "}
+                                </div>
 
-                                      {
-                                        productStock
-                                      }
-
-                                    </option>
-
-                                  );
-
-                                }
                               )}
 
-                            </select>
+                            </div>
 
                           </div>
 
