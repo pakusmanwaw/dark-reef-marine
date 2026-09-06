@@ -556,11 +556,29 @@ function Admin() {
       // =======================================================
 
       if (editingId) {
+        const existingItem = biota.find(
+          (item) => item.id === editingId
+        );
+
+        const oldStock = Number(
+          existingItem?.stock ?? 0
+        );
+
+        const stockChanged =
+          oldStock !== stockValue;
+
+        const updatePayload = stockChanged
+          ? {
+              ...dataToSave,
+              updated_at: new Date().toISOString(),
+            }
+          : dataToSave;
+
         const {
           error: updateError,
         } = await supabase
           .from("biota")
-          .update(dataToSave)
+          .update(updatePayload)
           .eq("id", editingId);
 
         if (updateError) {

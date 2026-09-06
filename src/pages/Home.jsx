@@ -27,9 +27,11 @@ function Home() {
           retail_price,
           stock,
           image_url,
-          created_at
+          created_at,
+          updated_at
         `)
-        .order("created_at", { ascending: false })
+        .gt("stock", 0)
+        .order("updated_at", { ascending: false })
         .limit(4);
 
       if (cancelled) {
