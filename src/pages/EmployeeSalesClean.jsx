@@ -2472,6 +2472,7 @@ function EmployeeSalesClean() {
 
                             <input
                               type="number"
+                              inputMode="numeric"
                               min="1"
                               max={
                                 stock > 0
@@ -2492,7 +2493,7 @@ function EmployeeSalesClean() {
                                   event.target.value
                                 )
                               }
-                              className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:bg-slate-100 disabled:text-slate-400"
+                              className="mt-2 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:bg-slate-100 disabled:text-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
 
 
