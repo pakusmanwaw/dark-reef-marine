@@ -2231,7 +2231,7 @@ function EmployeeSalesClean() {
                         className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
                       >
 
-                        <div className="grid gap-4 lg:grid-cols-[1fr_140px_190px_auto] lg:items-end">
+                        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_180px_220px_70px] lg:items-end">
 
                           <div>
 
@@ -2469,37 +2469,45 @@ function EmployeeSalesClean() {
                               Jumlah
                             </label>
 
+                            <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-center">
 
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min="1"
-                              max={
-                                stock > 0
-                                  ? stock
-                                  : undefined
-                              }
-                              value={
-                                item.quantity
-                              }
-                              disabled={
-                                !item.productId
-                              }
-                              onChange={(
-                                event
-                              ) =>
-                                handleQuantityChange(
-                                  index,
-                                  event.target.value
-                                )
-                              }
-                              className="mt-2 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 disabled:bg-slate-100 disabled:text-slate-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                            />
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                value={item.quantity}
+                                disabled={!item.productId}
+                                onFocus={(event) => event.target.select()}
+                                onChange={(event) => {
+                                  const rawValue = event.target.value.replace(/\D/g, "");
 
+                                  if (!rawValue) {
+                                    return;
+                                  }
+
+                                  const nextQuantity = Math.max(
+                                    1,
+                                    Math.min(
+                                      Number(rawValue),
+                                      stock > 0 ? stock : Number(rawValue)
+                                    )
+                                  );
+
+                                  handleQuantityChange(index, nextQuantity);
+                                }}
+                                className="w-full bg-transparent text-center text-xl font-bold leading-none text-slate-900 outline-none disabled:text-slate-400"
+                                aria-label={`Jumlah ${product?.name || "biota"}`}
+                              />
+
+                              <p className="mt-1 text-[11px] text-slate-400">
+                                ekor / item
+                              </p>
+
+                            </div>
 
                             {product && (
 
-                              <p className="mt-1 text-xs text-slate-400">
+                              <p className="mt-1 text-xs text-slate-400 text-center">
                                 Stok tersedia:{" "}
                                 {stock}
                               </p>
@@ -2516,7 +2524,7 @@ function EmployeeSalesClean() {
                             </p>
 
 
-                            <div className="mt-2 rounded-xl bg-white px-4 py-3">
+                            <div className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3">
 
                               <p className="text-xs text-slate-400">
 
@@ -2555,7 +2563,7 @@ function EmployeeSalesClean() {
                               items.length ===
                               1
                             }
-                            className="rounded-xl px-4 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30"
+                            className="w-full rounded-xl px-3 py-3 text-center text-sm font-semibold text-red-500 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 lg:w-auto"
                           >
                             Hapus
                           </button>
