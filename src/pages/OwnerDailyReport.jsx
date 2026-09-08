@@ -448,14 +448,16 @@ function OwnerDailyReport() {
   }, [losses]);
 
   // =======================================================
-  // STOCK SUMMARY
+  // STOCK MOVEMENTS
+  // URUT BERDASARKAN WAKTU KEJADIAN
   // =======================================================
 
   const stockSummary = useMemo(() => {
-    const map = new Map();
+    const movements = [];
 
     // ---------------------------------------------------
     // BARANG TERJUAL
+    // Waktu penjualan diambil dari transaksi induknya.
     // ---------------------------------------------------
 
     saleItems.forEach((item) => {
@@ -465,18 +467,23 @@ function OwnerDailyReport() {
         return;
       }
 
-      const existing =
-        map.get(id) || {
-          biotaId: id,
-          sold: 0,
-          loss: 0,
-        };
-
-      existing.sold += Number(
-        item.quantity || 0
+      const sale = sales.find(
+        (currentSale) =>
+          String(currentSale.id) ===
+          String(item.sale_id)
       );
 
-      map.set(id, existing);
+      const movementAt =
+        item.created_at ||
+        sale?.created_at ||
+        null;
+
+      movements.push({
+        movementAt,
+        biotaId: id,
+        sold: Number(item.quantity || 0),
+        loss: 0,
+      });
     });
 
     // ---------------------------------------------------
@@ -490,42 +497,52 @@ function OwnerDailyReport() {
         return;
       }
 
-      const existing =
-        map.get(id) || {
-          biotaId: id,
-          sold: 0,
-          loss: 0,
+      movements.push({
+        movementAt: loss.created_at || null,
+        biotaId: id,
+        sold: 0,
+        loss: Number(loss.quantity || 0),
+      });
+    });
+
+    // ---------------------------------------------------
+    // GABUNG DENGAN DATA BIOTA + URUTKAN WAKTU
+    // Paling awal = nomor 1.
+    // ---------------------------------------------------
+
+    return movements
+      .map((item, index) => {
+        const product = biota.find(
+          (b) =>
+            String(b.id) ===
+            String(item.biotaId)
+        );
+
+        return {
+          ...item,
+          originalIndex: index,
+          product,
+          stock: Number(
+            product?.stock || 0
+          ),
         };
+      })
+      .sort((a, b) => {
+        const timeA = a.movementAt
+          ? new Date(a.movementAt).getTime()
+          : Number.POSITIVE_INFINITY;
+        const timeB = b.movementAt
+          ? new Date(b.movementAt).getTime()
+          : Number.POSITIVE_INFINITY;
 
-      existing.loss += Number(
-        loss.quantity || 0
-      );
+        if (timeA !== timeB) {
+          return timeA - timeB;
+        }
 
-      map.set(id, existing);
-    });
-
-    // ---------------------------------------------------
-    // GABUNG DENGAN DATA BIOTA
-    // ---------------------------------------------------
-
-    return Array.from(
-      map.values()
-    ).map((item) => {
-      const product = biota.find(
-        (b) =>
-          String(b.id) ===
-          String(item.biotaId)
-      );
-
-      return {
-        ...item,
-        product,
-        stock: Number(
-          product?.stock || 0
-        ),
-      };
-    });
+        return a.originalIndex - b.originalIndex;
+      });
   }, [
+    sales,
     saleItems,
     losses,
     biota,
@@ -1091,9 +1108,18 @@ function OwnerDailyReport() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-162.5 text-sm">
+              <table className="w-full min-w-225 text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-400">
+                    <th className="px-3 py-3">
+                      No
+                    </th>
+                    <th className="px-3 py-3">
+                      Tanggal
+                    </th>
+                    <th className="px-3 py-3">
+                      Jam
+                    </th>
                     <th className="px-3 py-3">
                       Produk
                     </th>
@@ -1110,11 +1136,29 @@ function OwnerDailyReport() {
                 </thead>
 
                 <tbody>
-                  {stockSummary.map((item) => (
+                  {stockSummary.map((item, index) => (
                     <tr
-                      key={item.biotaId}
+                      key={`${item.biotaId}-${item.movementAt || "unknown"}-${index}`}
                       className="border-b border-slate-100 last:border-0"
                     >
+                      <td className="px-3 py-4 font-semibold text-slate-400">
+                        {index + 1}
+                      </td>
+
+                      <td className="px-3 py-4 text-slate-500">
+                        {item.movementAt
+                          ? new Date(item.movementAt).toLocaleDateString("id-ID", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                          : "-"}
+                      </td>
+
+                      <td className="px-3 py-4 font-semibold text-slate-500">
+                        {formatTime(item.movementAt)}
+                      </td>
+
                       <td className="px-3 py-4">
                         <p className="font-bold">
                           {item.product?.name ||
