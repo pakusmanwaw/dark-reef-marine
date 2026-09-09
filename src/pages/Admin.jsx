@@ -124,6 +124,38 @@ function Admin() {
     setLoading(false);
   }
 
+
+  // =========================================================
+  // LOG INVENTORY MOVEMENT
+  // =========================================================
+
+  async function logInventoryMovement({
+    biotaId,
+    productName,
+    activity,
+    quantityChange,
+    stockAfter,
+  }) {
+    const { error } = await supabase
+      .from("inventory_movements")
+      .insert([
+        {
+          biota_id: biotaId ?? null,
+          product_name: productName || "Produk",
+          activity,
+          quantity_change: Number(quantityChange || 0),
+          stock_after: stockAfter == null ? null : Number(stockAfter),
+        },
+      ]);
+
+    if (error) {
+      console.error(
+        "Gagal mencatat inventory movement:",
+        error
+      );
+    }
+  }
+
   // =========================================================
   // HANDLE INPUT
   // =========================================================
@@ -282,6 +314,10 @@ function Admin() {
     setMessageType("");
 
     try {
+      const deletedStock = Number(
+        deleteTarget.stock ?? 0
+      );
+
       const { error } = await supabase
         .from("biota")
         .delete()
@@ -292,6 +328,14 @@ function Admin() {
           `Gagal menghapus data: ${error.message}`
         );
       }
+
+      await logInventoryMovement({
+        biotaId: deleteTarget.id,
+        productName: deleteTarget.name,
+        activity: "Hapus Produk",
+        quantityChange: -deletedStock,
+        stockAfter: null,
+      });
 
       if (editingId === deleteTarget.id) {
         resetForm();
@@ -567,12 +611,13 @@ function Admin() {
         const stockChanged =
           oldStock !== stockValue;
 
-        const updatePayload = stockChanged
-          ? {
-              ...dataToSave,
-              updated_at: new Date().toISOString(),
-            }
-          : dataToSave;
+        // Setiap kali Owner menyimpan perubahan,
+        // updated_at diperbarui supaya produk yang baru
+        // diedit / update stok berada di urutan paling atas.
+        const updatePayload = {
+          ...dataToSave,
+          updated_at: new Date().toISOString(),
+        };
 
         const {
           error: updateError,
@@ -585,6 +630,16 @@ function Admin() {
           throw new Error(
             `Gagal mengupdate data: ${updateError.message}`
           );
+        }
+
+        if (stockChanged) {
+          await logInventoryMovement({
+            biotaId: editingId,
+            productName: existingItem?.name || form.name,
+            activity: "Update Stok",
+            quantityChange: stockValue - oldStock,
+            stockAfter: stockValue,
+          });
         }
 
         // -----------------------------------------------------
@@ -613,16 +668,27 @@ function Admin() {
       // =======================================================
 
       const {
+        data: insertedProduct,
         error: insertError,
       } = await supabase
         .from("biota")
-        .insert([dataToSave]);
+        .insert([dataToSave])
+        .select("id, name, stock")
+        .single();
 
       if (insertError) {
         throw new Error(
           `Gagal menyimpan data: ${insertError.message}`
         );
       }
+
+      await logInventoryMovement({
+        biotaId: insertedProduct?.id,
+        productName: insertedProduct?.name || dataToSave.name,
+        activity: "Tambah Produk",
+        quantityChange: stockValue,
+        stockAfter: stockValue,
+      });
 
       setMessage(
         isEquipment
@@ -695,11 +761,11 @@ function Admin() {
     const keyword =
       inventorySearch.trim().toLowerCase();
 
-    if (!keyword) {
-      return biota;
-    }
+    const filtered = biota.filter((item) => {
+      if (!keyword) {
+        return true;
+      }
 
-    return biota.filter((item) => {
       const name =
         item.name?.toLowerCase() || "";
 
@@ -722,6 +788,24 @@ function Admin() {
         condition.includes(keyword) ||
         description.includes(keyword)
       );
+    });
+
+    // Produk yang paling baru dibuat / diedit / update stok
+    // selalu berada di paling atas.
+    return [...filtered].sort((a, b) => {
+      const dateA = new Date(
+        a.updated_at ||
+          a.created_at ||
+          0
+      ).getTime();
+
+      const dateB = new Date(
+        b.updated_at ||
+          b.created_at ||
+          0
+      ).getTime();
+
+      return dateB - dateA;
     });
   }, [biota, inventorySearch]);
 

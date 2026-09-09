@@ -30,6 +30,7 @@ function OwnerDailyReport() {
   const [saleItems, setSaleItems] = useState([]);
   const [losses, setLosses] = useState([]);
   const [biota, setBiota] = useState([]);
+  const [inventoryMovements, setInventoryMovements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -222,6 +223,39 @@ function OwnerDailyReport() {
         }
 
         // =================================================
+        // INVENTORY MOVEMENTS
+        // Sumber histori stok permanen:
+        // - Tambah Produk
+        // - Update Stok
+        // - Penjualan
+        // - Kerugian
+        // - Hapus Produk
+        //
+        // Menggunakan RPC khusus Owner agar RLS
+        // inventory_movements tidak perlu dibuka ke client.
+        // =================================================
+
+        const {
+          data: movementData,
+          error: movementError,
+        } = await supabase.rpc(
+          "get_owner_inventory_movements",
+          {
+            p_start_at: startIso,
+            p_end_at: endIso,
+          }
+        );
+
+        if (movementError) {
+          throw movementError;
+        }
+
+        const safeInventoryMovements =
+          Array.isArray(movementData)
+            ? movementData
+            : [];
+
+        // =================================================
         // VALIDASI RESPONSE RPC
         // =================================================
 
@@ -262,6 +296,8 @@ function OwnerDailyReport() {
             sale_items: safeSaleItems.length,
             losses: safeLosses.length,
             biota: safeBiota.length,
+            inventory_movements:
+              safeInventoryMovements.length,
           }
         );
 
@@ -277,6 +313,9 @@ function OwnerDailyReport() {
         setSaleItems(safeSaleItems);
         setLosses(safeLosses);
         setBiota(safeBiota);
+        setInventoryMovements(
+          safeInventoryMovements
+        );
       } catch (error) {
         if (!cancelled) {
           console.error(
@@ -449,102 +488,45 @@ function OwnerDailyReport() {
 
   // =======================================================
   // STOCK MOVEMENTS
-  // URUT BERDASARKAN WAKTU KEJADIAN
+  // SUMBER: inventory_movements
+  // URUT DARI AKTIVITAS PALING AWAL
   // =======================================================
 
   const stockSummary = useMemo(() => {
-    const movements = [];
-
-    // ---------------------------------------------------
-    // BARANG TERJUAL
-    // Waktu penjualan diambil dari transaksi induknya.
-    // ---------------------------------------------------
-
-    saleItems.forEach((item) => {
-      const id = item.biota_id;
-
-      if (!id) {
-        return;
-      }
-
-      const sale = sales.find(
-        (currentSale) =>
-          String(currentSale.id) ===
-          String(item.sale_id)
-      );
-
-      const movementAt =
-        item.created_at ||
-        sale?.created_at ||
-        null;
-
-      movements.push({
-        movementAt,
-        biotaId: id,
-        sold: Number(item.quantity || 0),
-        loss: 0,
-      });
-    });
-
-    // ---------------------------------------------------
-    // BARANG HILANG
-    // ---------------------------------------------------
-
-    losses.forEach((loss) => {
-      const id = loss.biota_id;
-
-      if (!id) {
-        return;
-      }
-
-      movements.push({
-        movementAt: loss.created_at || null,
-        biotaId: id,
-        sold: 0,
-        loss: Number(loss.quantity || 0),
-      });
-    });
-
-    // ---------------------------------------------------
-    // GABUNG DENGAN DATA BIOTA + URUTKAN WAKTU
-    // Paling awal = nomor 1.
-    // ---------------------------------------------------
-
-    return movements
-      .map((item, index) => {
+    return inventoryMovements
+      .map((movement, index) => {
         const product = biota.find(
-          (b) =>
-            String(b.id) ===
-            String(item.biotaId)
+          (item) =>
+            String(item.id) ===
+            String(movement.biota_id)
         );
 
         return {
-          ...item,
+          ...movement,
           originalIndex: index,
           product,
-          stock: Number(
-            product?.stock || 0
-          ),
         };
       })
       .sort((a, b) => {
-        const timeA = a.movementAt
-          ? new Date(a.movementAt).getTime()
+        const timeA = a.created_at
+          ? new Date(a.created_at).getTime()
           : Number.POSITIVE_INFINITY;
-        const timeB = b.movementAt
-          ? new Date(b.movementAt).getTime()
+
+        const timeB = b.created_at
+          ? new Date(b.created_at).getTime()
           : Number.POSITIVE_INFINITY;
 
         if (timeA !== timeB) {
           return timeA - timeB;
         }
 
-        return a.originalIndex - b.originalIndex;
+        return (
+          Number(a.id || 0) -
+          Number(b.id || 0)
+        );
       });
   }, [
-    sales,
-    saleItems,
-    losses,
+    inventoryMovements,
     biota,
   ]);
 
@@ -1096,14 +1078,14 @@ function OwnerDailyReport() {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Produk yang terjual atau mengalami kerugian pada tanggal yang dipilih.
+              Riwayat seluruh perubahan stok pada tanggal yang dipilih.
             </p>
           </div>
 
           {stockSummary.length === 0 ? (
             <div className="rounded-2xl bg-slate-50 p-8 text-center">
               <p className="font-semibold text-slate-500">
-                Belum ada pergerakan produk pada tanggal ini.
+                Belum ada pergerakan stok pada tanggal ini.
               </p>
             </div>
           ) : (
@@ -1114,91 +1096,152 @@ function OwnerDailyReport() {
                     <th className="px-3 py-3">
                       No
                     </th>
+
                     <th className="px-3 py-3">
                       Tanggal
                     </th>
+
                     <th className="px-3 py-3">
                       Jam
                     </th>
+
+                    <th className="px-3 py-3">
+                      Aktivitas
+                    </th>
+
                     <th className="px-3 py-3">
                       Produk
                     </th>
+
                     <th className="px-3 py-3">
-                      Terjual
+                      Perubahan
                     </th>
+
                     <th className="px-3 py-3">
-                      Hilang
-                    </th>
-                    <th className="px-3 py-3">
-                      Sisa Stok
+                      Stok
                     </th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {stockSummary.map((item, index) => (
-                    <tr
-                      key={`${item.biotaId}-${item.movementAt || "unknown"}-${index}`}
-                      className="border-b border-slate-100 last:border-0"
-                    >
-                      <td className="px-3 py-4 font-semibold text-slate-400">
-                        {index + 1}
-                      </td>
+                  {stockSummary.map((item, index) => {
+                    const quantityChange =
+                      Number(
+                        item.quantity_change || 0
+                      );
 
-                      <td className="px-3 py-4 text-slate-500">
-                        {item.movementAt
-                          ? new Date(item.movementAt).toLocaleDateString("id-ID", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </td>
+                    const stockAfter =
+                      item.stock_after == null
+                        ? null
+                        : Number(
+                            item.stock_after
+                          );
 
-                      <td className="px-3 py-4 font-semibold text-slate-500">
-                        {formatTime(item.movementAt)}
-                      </td>
+                    const activityClass =
+                      item.activity === "Penjualan"
+                        ? "bg-blue-50 text-blue-700"
+                        : item.activity === "Kerugian"
+                        ? "bg-red-50 text-red-700"
+                        : item.activity === "Hapus Produk"
+                        ? "bg-slate-100 text-slate-600"
+                        : item.activity === "Tambah Produk"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-amber-50 text-amber-700";
 
-                      <td className="px-3 py-4">
-                        <p className="font-bold">
-                          {item.product?.name ||
-                            "Biota"}
-                        </p>
+                    const changeClass =
+                      quantityChange > 0
+                        ? "text-emerald-600"
+                        : quantityChange < 0
+                        ? "text-red-600"
+                        : "text-slate-500";
 
-                        {item.product
-                          ?.english_name && (
-                          <p className="mt-1 text-xs text-slate-400">
-                            {
-                              item.product
-                                .english_name
-                            }
+                    return (
+                      <tr
+                        key={`${item.id}-${item.created_at || "unknown"}`}
+                        className="border-b border-slate-100 last:border-0"
+                      >
+                        <td className="px-3 py-4 font-semibold text-slate-400">
+                          {index + 1}
+                        </td>
+
+                        <td className="px-3 py-4 text-slate-500">
+                          {item.created_at
+                            ? new Date(
+                                item.created_at
+                              ).toLocaleDateString(
+                                "id-ID",
+                                {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                }
+                              )
+                            : "-"}
+                        </td>
+
+                        <td className="px-3 py-4 font-semibold text-slate-500">
+                          {formatTime(
+                            item.created_at
+                          )}
+                        </td>
+
+                        <td className="px-3 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-bold ${activityClass}`}
+                          >
+                            {item.activity ||
+                              "-"}
+                          </span>
+                        </td>
+
+                        <td className="px-3 py-4">
+                          <p className="font-bold">
+                            {item.product_name ||
+                              item.product?.name ||
+                              "Biota"}
                           </p>
-                        )}
-                      </td>
 
-                      <td className="px-3 py-4 font-semibold">
-                        {item.sold}
-                      </td>
+                          {item.product
+                            ?.english_name && (
+                            <p className="mt-1 text-xs text-slate-400">
+                              {
+                                item.product
+                                  .english_name
+                              }
+                            </p>
+                          )}
+                        </td>
 
-                      <td className="px-3 py-4 font-semibold text-red-600">
-                        {item.loss}
-                      </td>
-
-                      <td className="px-3 py-4">
-                        <span
-                          className={
-                            item.stock <= 0
-                              ? "rounded-full bg-red-50 px-3 py-1 font-bold text-red-600"
-                              : item.stock <= 3
-                              ? "rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-600"
-                              : "rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-600"
-                          }
+                        <td
+                          className={`px-3 py-4 font-bold ${changeClass}`}
                         >
-                          {item.stock}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                          {quantityChange > 0
+                            ? `+${quantityChange}`
+                            : quantityChange}
+                        </td>
+
+                        <td className="px-3 py-4">
+                          {stockAfter == null ? (
+                            <span className="font-semibold text-slate-400">
+                              —
+                            </span>
+                          ) : (
+                            <span
+                              className={
+                                stockAfter <= 0
+                                  ? "rounded-full bg-red-50 px-3 py-1 font-bold text-red-600"
+                                  : stockAfter <= 3
+                                  ? "rounded-full bg-amber-50 px-3 py-1 font-bold text-amber-600"
+                                  : "rounded-full bg-emerald-50 px-3 py-1 font-bold text-emerald-600"
+                              }
+                            >
+                              {stockAfter}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

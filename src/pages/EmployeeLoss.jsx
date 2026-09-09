@@ -362,13 +362,6 @@ function EmployeeLoss() {
     setSaving(true);
 
     try {
-      // =================================================
-      // EMPLOYEE TIDAK MENGIRIM HPP
-      //
-      // create_loss() mengambil cost_price
-      // langsung dari database.
-      // =================================================
-
       const {
         data,
         error,
@@ -400,6 +393,60 @@ function EmployeeLoss() {
         throw new Error(
           data?.message ||
             "Kerugian gagal disimpan."
+        );
+      }
+
+      // =================================================
+      // INVENTORY MOVEMENT
+      // create_loss sudah berhasil mengurangi stok.
+      // Ambil stok terbaru lalu catat ke histori.
+      // =================================================
+      try {
+        const { data: latestBiota, error: stockError } =
+          await supabase
+            .from("biota")
+            .select("id, name, stock")
+            .eq("id", Number(selectedBiota.id))
+            .single();
+
+        if (stockError) {
+          console.error(
+            "Gagal mengambil stok setelah kerugian:",
+            stockError
+          );
+        } else {
+          const { error: movementError } = await supabase
+            .from("inventory_movements")
+            .insert([
+              {
+                biota_id: Number(selectedBiota.id),
+                product_name:
+                  latestBiota?.name ||
+                  selectedBiota?.name ||
+                  "Produk",
+                activity: "Kerugian",
+                quantity_change: -Math.abs(finalQuantity),
+                stock_after:
+                  latestBiota?.stock == null
+                    ? null
+                    : Number(latestBiota.stock),
+                created_at:
+                  data?.created_at ||
+                  new Date().toISOString(),
+              },
+            ]);
+
+          if (movementError) {
+            console.error(
+              "Gagal mencatat histori kerugian:",
+              movementError
+            );
+          }
+        }
+      } catch (movementError) {
+        console.error(
+          "Inventory movement loss log error:",
+          movementError
         );
       }
 

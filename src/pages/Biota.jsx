@@ -51,8 +51,7 @@ function Biota() {
           image_url,
           created_at
         `)
-        .order("created_at", { ascending: false })
-        ;
+        .order("created_at", { ascending: false });
 
       if (cancelled) {
         return;
@@ -64,19 +63,118 @@ function Biota() {
           error
         );
 
-         setError(
-    error?.message ||
-    error?.details ||
-    error?.hint ||
-    "Data biota tidak dapat dimuat. Silakan coba lagi."
-  );
+        setError(
+          error?.message ||
+          error?.details ||
+          error?.hint ||
+          "Data biota tidak dapat dimuat. Silakan coba lagi."
+        );
 
         setBiotaData([]);
-      } else {
-        setBiotaData(data || []);
+        setLoading(false);
+        return;
       }
 
+      // =====================================================
+      // AMBIL WAKTU PERGERAKAN STOK TERAKHIR
+      // =====================================================
+      //
+      // inventory_movements tidak dibaca langsung oleh
+      // pengunjung. RPC hanya mengembalikan:
+      // biota_id + latest_movement_at
+      //
+      // Produk yang baru bergerak akan ditempatkan paling atas.
+      // Produk yang belum pernah tercatat bergerak akan berada
+      // setelahnya berdasarkan created_at.
+      // =====================================================
+
+      const {
+        data: movementData,
+        error: movementError,
+      } = await supabase.rpc(
+        "get_public_latest_inventory_movements"
+      );
+
+      if (movementError) {
+        console.error(
+          "Gagal mengambil waktu pergerakan stok:",
+          movementError
+        );
+
+        // Jangan membuat halaman Biota gagal hanya karena
+        // histori movement tidak tersedia.
+        // Fallback: gunakan created_at seperti sebelumnya.
+        setBiotaData(data || []);
+        setLoading(false);
+        return;
+      }
+
+      const latestMovementByBiotaId =
+        new Map(
+          (Array.isArray(movementData)
+            ? movementData
+            : []
+          ).map((item) => [
+            String(item.biota_id),
+            item.latest_movement_at,
+          ])
+        );
+
+      const sortedData = [...(data || [])].sort(
+        (a, b) => {
+          const movementA =
+            latestMovementByBiotaId.get(
+              String(a.id)
+            );
+
+          const movementB =
+            latestMovementByBiotaId.get(
+              String(b.id)
+            );
+
+          // Produk yang pernah bergerak:
+          // movement terbaru = paling atas.
+          if (movementA && movementB) {
+            const timeA = new Date(
+              movementA
+            ).getTime();
+
+            const timeB = new Date(
+              movementB
+            ).getTime();
+
+            if (timeA !== timeB) {
+              return timeB - timeA;
+            }
+          }
+
+          // Produk yang bergerak selalu di atas
+          // produk yang belum pernah punya movement.
+          if (movementA && !movementB) {
+            return -1;
+          }
+
+          if (!movementA && movementB) {
+            return 1;
+          }
+
+          // Kalau sama-sama belum pernah bergerak,
+          // pertahankan logika lama: produk terbaru dulu.
+          const createdA = a.created_at
+            ? new Date(a.created_at).getTime()
+            : 0;
+
+          const createdB = b.created_at
+            ? new Date(b.created_at).getTime()
+            : 0;
+
+          return createdB - createdA;
+        }
+      );
+
+      setBiotaData(sortedData);
       setLoading(false);
+
     }
 
     fetchBiota();

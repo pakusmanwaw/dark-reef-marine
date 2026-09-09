@@ -38,6 +38,22 @@ function OwnerSales() {
   const [channelFilter, setChannelFilter] =
     useState("all");
 
+  // =========================================================
+  // DETAIL NOTA
+  // =========================================================
+
+  const [selectedSale, setSelectedSale] =
+    useState(null);
+
+  const [selectedSaleItems, setSelectedSaleItems] =
+    useState([]);
+
+  const [detailLoading, setDetailLoading] =
+    useState(false);
+
+  const [detailError, setDetailError] =
+    useState("");
+
 
   // =========================================================
   // FORMAT RUPIAH
@@ -664,6 +680,87 @@ function OwnerSales() {
 
 
   // =========================================================
+  // OPEN DETAIL NOTA
+  // =========================================================
+
+  async function handleOpenSaleDetail(sale) {
+
+    setSelectedSale(sale);
+
+    setSelectedSaleItems([]);
+
+    setDetailError("");
+
+    setDetailLoading(true);
+
+    try {
+
+      const {
+        data: itemData,
+        error: itemError,
+      } = await supabase
+        .from("sale_items")
+        .select(`
+          id,
+          sale_id,
+          biota_id,
+          quantity,
+          unit_price,
+          unit_cost,
+          is_bonus,
+          product_name,
+          subtotal
+        `)
+        .eq("sale_id", sale.id)
+        .order("id", {
+          ascending: true,
+        });
+
+      if (itemError) {
+        throw itemError;
+      }
+
+      setSelectedSaleItems(
+        itemData || []
+      );
+
+    } catch (error) {
+
+      console.error(
+        "Gagal mengambil detail nota:",
+        error
+      );
+
+      setDetailError(
+        error?.message ||
+          "Gagal mengambil detail produk nota."
+      );
+
+      setSelectedSaleItems([]);
+
+    } finally {
+
+      setDetailLoading(false);
+
+    }
+
+  }
+
+
+  function handleCloseSaleDetail() {
+
+    setSelectedSale(null);
+
+    setSelectedSaleItems([]);
+
+    setDetailError("");
+
+    setDetailLoading(false);
+
+  }
+
+
+  // =========================================================
   // RENDER
   // =========================================================
 
@@ -1255,14 +1352,23 @@ function OwnerSales() {
 
                           <td className="px-4 py-4">
 
-                            <p className="font-bold text-slate-900">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenSaleDetail(
+                                  sale
+                                )
+                              }
+                              className="text-left font-bold text-cyan-700 underline decoration-cyan-300 underline-offset-2 transition hover:text-cyan-900"
+                              title="Lihat isi nota"
+                            >
 
                               {
                                 sale.sale_number ||
                                 "-"
                               }
 
-                            </p>
+                            </button>
 
 
                             {sale.invoice_number &&
@@ -1449,6 +1555,391 @@ function OwnerSales() {
         </section>
 
       </div>
+
+      {/* =================================================
+          MODAL DETAIL NOTA
+      ================================================= */}
+
+      {selectedSale && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCloseSaleDetail();
+            }
+          }}
+        >
+
+          <div
+            className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="owner-sale-detail-title"
+          >
+
+            {/* HEADER */}
+
+            <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-5 py-5 sm:px-6">
+
+              <div className="flex items-start justify-between gap-4">
+
+                <div className="min-w-0">
+
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-600">
+                    Detail Nota
+                  </p>
+
+                  <h2
+                    id="owner-sale-detail-title"
+                    className="mt-1 break-all text-lg font-bold text-slate-900 sm:text-xl"
+                  >
+                    {selectedSale.sale_number ||
+                      selectedSale.invoice_number ||
+                      "-"}
+                  </h2>
+
+                  {selectedSale.invoice_number &&
+                    selectedSale.invoice_number !==
+                      selectedSale.sale_number && (
+                      <p className="mt-1 break-all text-xs text-slate-400">
+                        Invoice:{" "}
+                        {selectedSale.invoice_number}
+                      </p>
+                    )}
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCloseSaleDetail}
+                  className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-lg font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                  aria-label="Tutup detail nota"
+                >
+                  ✕
+                </button>
+
+              </div>
+
+            </div>
+
+
+            {/* INFO NOTA */}
+
+            <div className="grid gap-3 border-b border-slate-200 bg-slate-50 px-5 py-5 sm:grid-cols-2 sm:px-6">
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Customer
+                </p>
+
+                <p className="mt-1 font-bold text-slate-800">
+                  {selectedSale.customer_name ||
+                    "Tanpa nama"}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Tanggal
+                </p>
+
+                <p className="mt-1 font-semibold text-slate-700">
+                  {formatDate(
+                    selectedSale.created_at
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Channel
+                </p>
+
+                <p className="mt-1 font-semibold text-slate-700">
+                  {getChannelLabel(
+                    selectedSale.sale_type
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  Status
+                </p>
+
+                <p className="mt-1 font-semibold text-slate-700">
+                  {selectedSale.status ===
+                  "completed"
+                    ? "Completed"
+                    : selectedSale.status ||
+                      "-"}
+                </p>
+              </div>
+
+            </div>
+
+
+            {/* PRODUK */}
+
+            <div className="px-5 py-5 sm:px-6">
+
+              <div className="mb-4">
+
+                <h3 className="text-base font-bold text-slate-900">
+                  Produk yang Dipesan
+                </h3>
+
+                <p className="mt-1 text-xs text-slate-500">
+                  Isi pesanan yang tercatat pada nota ini.
+                </p>
+
+              </div>
+
+
+              {detailLoading ? (
+
+                <div className="rounded-2xl bg-slate-50 px-5 py-10 text-center">
+
+                  <div className="mx-auto h-7 w-7 animate-spin rounded-full border-4 border-slate-200 border-t-cyan-500" />
+
+                  <p className="mt-3 text-sm text-slate-500">
+                    Memuat isi nota...
+                  </p>
+
+                </div>
+
+              ) : detailError ? (
+
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-600">
+                  {detailError}
+                </div>
+
+              ) : selectedSaleItems.length === 0 ? (
+
+                <div className="rounded-2xl bg-slate-50 px-5 py-8 text-center">
+
+                  <p className="font-semibold text-slate-500">
+                    Tidak ada detail produk pada nota ini.
+                  </p>
+
+                </div>
+
+              ) : (
+
+                <div className="overflow-x-auto rounded-2xl border border-slate-200">
+
+                  <table className="w-full min-w-140 text-sm">
+
+                    <thead className="bg-slate-50">
+
+                      <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wider text-slate-400">
+
+                        <th className="px-4 py-3">
+                          Produk
+                        </th>
+
+                        <th className="px-4 py-3 text-center">
+                          Qty
+                        </th>
+
+                        <th className="px-4 py-3 text-right">
+                          Harga
+                        </th>
+
+                        <th className="px-4 py-3 text-right">
+                          Subtotal
+                        </th>
+
+                      </tr>
+
+                    </thead>
+
+                    <tbody>
+
+                      {selectedSaleItems.map(
+                        (item) => {
+
+                          const quantity =
+                            Number(
+                              item.quantity || 0
+                            );
+
+                          const unitPrice =
+                            Number(
+                              item.unit_price || 0
+                            );
+
+                          const subtotal =
+                            Number(
+                              item.subtotal ??
+                                quantity *
+                                  unitPrice
+                            );
+
+                          return (
+                            <tr
+                              key={item.id}
+                              className="border-b border-slate-100 last:border-0"
+                            >
+
+                              <td className="px-4 py-4">
+
+                                <p className="font-semibold text-slate-800">
+                                  {item.product_name ||
+                                    "Produk"}
+                                </p>
+
+                                {item.is_bonus && (
+                                  <span className="mt-1 inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                                    Bonus
+                                  </span>
+                                )}
+
+                              </td>
+
+                              <td className="px-4 py-4 text-center font-semibold text-slate-700">
+                                {quantity}
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-4 text-right text-slate-600">
+                                Rp{" "}
+                                {formatRupiah(
+                                  unitPrice
+                                )}
+                              </td>
+
+                              <td className="whitespace-nowrap px-4 py-4 text-right font-bold text-slate-800">
+                                Rp{" "}
+                                {formatRupiah(
+                                  subtotal
+                                )}
+                              </td>
+
+                            </tr>
+                          );
+
+                        }
+                      )}
+
+                    </tbody>
+
+                  </table>
+
+                </div>
+
+              )}
+
+            </div>
+
+
+            {/* TOTAL */}
+
+            <div className="border-t border-slate-200 bg-slate-50 px-5 py-5 sm:px-6">
+
+              <div className="space-y-2">
+
+                <div className="flex items-center justify-between gap-4 text-sm">
+
+                  <span className="text-slate-500">
+                    Customer Bayar
+                  </span>
+
+                  <span className="font-bold text-slate-800">
+                    Rp{" "}
+                    {formatRupiah(
+                      selectedSale.total_amount ??
+                        selectedSale.total ??
+                        0
+                    )}
+                  </span>
+
+                </div>
+
+                <div className="flex items-center justify-between gap-4 text-sm">
+
+                  <span className="text-slate-500">
+                    Nilai Owner
+                  </span>
+
+                  <span className="font-bold text-emerald-600">
+                    Rp{" "}
+                    {formatRupiah(
+                      selectedSale.owner_total ||
+                        0
+                    )}
+                  </span>
+
+                </div>
+
+                {selectedSale.sale_type ===
+                  "online_shop" && (
+                  <div className="flex items-center justify-between gap-4 text-sm">
+
+                    <span className="text-slate-500">
+                      Selisih Online Shop
+                    </span>
+
+                    <span className="font-bold text-amber-600">
+                      Rp{" "}
+                      {formatRupiah(
+                        Math.max(
+                          Number(
+                            selectedSale.total_amount ??
+                              selectedSale.total ??
+                              0
+                          ) -
+                            Number(
+                              selectedSale.owner_total ||
+                                0
+                            ),
+                          0
+                        )
+                      )}
+                    </span>
+
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-4 border-t border-slate-200 pt-3">
+
+                  <span className="text-lg font-bold text-slate-900">
+                    TOTAL
+                  </span>
+
+                  <span className="text-xl font-bold text-cyan-600">
+                    Rp{" "}
+                    {formatRupiah(
+                      selectedSale.total_amount ??
+                        selectedSale.total ??
+                        0
+                    )}
+                  </span>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* FOOTER */}
+
+            <div className="px-5 pb-5 pt-3 sm:px-6">
+
+              <button
+                type="button"
+                onClick={handleCloseSaleDetail}
+                className="w-full rounded-xl bg-slate-900 px-5 py-3.5 text-sm font-bold text-white transition hover:bg-slate-800"
+              >
+                Tutup
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
     </main>
 
