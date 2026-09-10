@@ -757,78 +757,6 @@ function EmployeeSalesClean() {
   // SAVE SALE
   // =========================================================
 
-  async function logSaleInventoryMovements(
-    saleItems,
-    movementAt
-  ) {
-    try {
-      const biotaIds = [
-        ...new Set(
-          saleItems
-            .map((item) => Number(item.productId))
-            .filter((id) => Number.isFinite(id))
-        ),
-      ];
-
-      if (biotaIds.length === 0) {
-        return;
-      }
-
-      const { data: latestProducts, error: stockError } =
-        await supabase
-          .from("biota")
-          .select("id, name, stock")
-          .in("id", biotaIds);
-
-      if (stockError) {
-        console.error(
-          "Gagal mengambil stok setelah penjualan:",
-          stockError
-        );
-        return;
-      }
-
-      const latestById = new Map(
-        (latestProducts || []).map((product) => [
-          String(product.id),
-          product,
-        ])
-      );
-
-      const movementRows = saleItems.map((item) => {
-        const product = latestById.get(String(item.productId));
-        const fallbackProduct = getProduct(item.productId);
-
-        return {
-          biota_id: Number(item.productId),
-          product_name:
-            product?.name || fallbackProduct?.name || "Produk",
-          activity: "Penjualan",
-          quantity_change: -Math.abs(Number(item.quantity || 0)),
-          stock_after:
-            product?.stock == null ? null : Number(product.stock),
-          created_at: movementAt || new Date().toISOString(),
-        };
-      });
-
-      const { error: movementError } = await supabase
-        .from("inventory_movements")
-        .insert(movementRows);
-
-      if (movementError) {
-        console.error(
-          "Gagal mencatat histori penjualan:",
-          movementError
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Inventory movement sale log error:",
-        error
-      );
-    }
-  }
-
   async function handleSaveSale(
     event
   ) {
@@ -999,14 +927,7 @@ function EmployeeSalesClean() {
       }
 
 
-      // =====================================================
-      // CATAT PERGERAKAN STOK PENJUALAN
-      // =====================================================
 
-      await logSaleInventoryMovements(
-        items,
-        data?.created_at || new Date().toISOString()
-      );
 
 
       // =====================================================
